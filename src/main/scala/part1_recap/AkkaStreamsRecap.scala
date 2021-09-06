@@ -1,16 +1,13 @@
 package part1_recap
 
 import akka.actor.ActorSystem
-import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
-
-import scala.util.{Failure, Success}
+import akka.stream.{ActorMaterializer, OverflowStrategy}
 
 object AkkaStreamsRecap extends App {
 
   implicit val system = ActorSystem("AkkaStreamsRecap")
   implicit val materializer = ActorMaterializer()
-  import system.dispatcher
 
   val source = Source(1 to 100)
   val sink = Sink.foreach[Int](println)
@@ -18,7 +15,7 @@ object AkkaStreamsRecap extends App {
 
   val runnableGraph = source.via(flow).to(sink)
   val simpleMaterializedValue = runnableGraph
-    // .run() // materialization
+  // .run() // materialization
 
   // MATERIALIZED VALUE
   val sumSink = Sink.fold[Int, Int](0)((currentSum, element) => currentSum + element)
@@ -30,7 +27,7 @@ object AkkaStreamsRecap extends App {
 //  }
 
   val anotherMaterializedValue = source.viaMat(flow)(Keep.right).toMat(sink)(Keep.left)
-    // .run()
+  // .run()
   /*
     1 - materializing a graph means materializing ALL the components
     2 - a materialized value can be ANYTHING AT ALL
@@ -47,12 +44,12 @@ object AkkaStreamsRecap extends App {
   val bufferedFlow = Flow[Int].buffer(10, OverflowStrategy.dropHead)
 
   source.async
-    .via(bufferedFlow).async
+    .via(bufferedFlow)
+    .async
     .runForeach { e =>
       // a slow consumer
       Thread.sleep(100)
       println(e)
     }
-
 
 }

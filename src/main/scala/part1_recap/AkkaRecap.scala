@@ -1,7 +1,16 @@
 package part1_recap
 
 import akka.actor.SupervisorStrategy.{Restart, Stop}
-import akka.actor.{Actor, ActorLogging, ActorSystem, OneForOneStrategy, PoisonPill, Props, Stash, SupervisorStrategy}
+import akka.actor.{
+  Actor,
+  ActorLogging,
+  ActorSystem,
+  OneForOneStrategy,
+  PoisonPill,
+  Props,
+  Stash,
+  SupervisorStrategy
+}
 import akka.util.Timeout
 
 object AkkaRecap extends App {
@@ -18,11 +27,11 @@ object AkkaRecap extends App {
         context.become(anotherHandler)
 
       case "change" => context.become(anotherHandler)
-      case message => println(s"I received: $message")
+      case message  => println(s"I received: $message")
     }
 
-    def anotherHandler: Receive = {
-      case message => println(s"In another receive handler: $message")
+    def anotherHandler: Receive = { case message =>
+      println(s"In another receive handler: $message")
     }
 
     override def preStart(): Unit = {
@@ -31,7 +40,7 @@ object AkkaRecap extends App {
 
     override def supervisorStrategy: SupervisorStrategy = OneForOneStrategy() {
       case _: RuntimeException => Restart
-      case _ => Stop
+      case _                   => Stop
     }
   }
 

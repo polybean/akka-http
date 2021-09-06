@@ -1,26 +1,30 @@
 package part2_lowlevelserver
 
+import akka.Done
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.IncomingConnection
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.Location
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Flow, Sink}
+import akka.stream.scaladsl.{Flow, Sink, Source}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.util.{Failure, Success}
 
 object LowLevelAPI extends App {
 
-  implicit val system = ActorSystem("LowLevelServerAPI")
-  implicit val materializer = ActorMaterializer()
+  implicit val system: ActorSystem = ActorSystem("LowLevelServerAPI")
+  implicit val materializer: ActorMaterializer = ActorMaterializer()
   import system.dispatcher
 
-  val serverSource = Http().bind("localhost", 8000)
-  val connectionSink = Sink.foreach[IncomingConnection] { connection =>
-    println(s"Accepted incoming connection from: ${connection.remoteAddress}")
+  val serverSource: Source[IncomingConnection, Future[Http.ServerBinding]] =
+    Http().bind("localhost", 8000)
+  val connectionSink: Sink[IncomingConnection, Future[Done]] = Sink.foreach[IncomingConnection] {
+    connection =>
+      println(s"Accepted incoming connection from: ${connection.remoteAddress}")
   }
 
   val serverBindingFuture = serverSource.to(connectionSink).run()
@@ -76,41 +80,50 @@ object LowLevelAPI extends App {
   // shorthand version:
   // Http().bindAndHandleSync(requestHandler, "localhost", 8080)
 
-
   /*
     Method 2: serve back HTTP response ASYNCHRONOUSLY
    */
   val asyncRequestHandler: HttpRequest => Future[HttpResponse] = {
-    case HttpRequest(HttpMethods.GET, Uri.Path("/home"), _, _, _) =>  // method, URI, HTTP headers, content and the protocol (HTTP1.1/HTTP2.0)
-      Future(HttpResponse(
-        StatusCodes.OK, // HTTP 200
-        entity = HttpEntity(
-          ContentTypes.`text/html(UTF-8)`,
-          """
+    case HttpRequest(
+          HttpMethods.GET,
+          Uri.Path("/home"),
+          _,
+          _,
+          _
+        ) => // method, URI, HTTP headers, content and the protocol (HTTP1.1/HTTP2.0)
+      Future(
+        HttpResponse(
+          StatusCodes.OK, // HTTP 200
+          entity = HttpEntity(
+            ContentTypes.`text/html(UTF-8)`,
+            """
             |<html>
             | <body>
             |   Hello from Akka HTTP!
             | </body>
             |</html>
           """.stripMargin
+          )
         )
-      ))
+      )
 
     case request: HttpRequest =>
       request.discardEntityBytes()
-      Future(HttpResponse(
-        StatusCodes.NotFound, // 404
-        entity = HttpEntity(
-          ContentTypes.`text/html(UTF-8)`,
-          """
+      Future(
+        HttpResponse(
+          StatusCodes.NotFound, // 404
+          entity = HttpEntity(
+            ContentTypes.`text/html(UTF-8)`,
+            """
             |<html>
             | <body>
             |   OOPS! The resource can't be found.
             | </body>
             |</html>
           """.stripMargin
+          )
         )
-      ))
+      )
   }
 
   val httpAsyncConnectionHandler = Sink.foreach[IncomingConnection] { connection =>
@@ -127,7 +140,13 @@ object LowLevelAPI extends App {
     Method 3: async via Akka streams
    */
   val streamsBasedRequestHandler: Flow[HttpRequest, HttpResponse, _] = Flow[HttpRequest].map {
-    case HttpRequest(HttpMethods.GET, Uri.Path("/home"), _, _, _) =>  // method, URI, HTTP headers, content and the protocol (HTTP1.1/HTTP2.0)
+    case HttpRequest(
+          HttpMethods.GET,
+          Uri.Path("/home"),
+          _,
+          _,
+          _
+        ) => // method, URI, HTTP headers, content and the protocol (HTTP1.1/HTTP2.0)
       HttpResponse(
         StatusCodes.OK, // HTTP 200
         entity = HttpEntity(
@@ -160,15 +179,14 @@ object LowLevelAPI extends App {
   }
 
   // "manual" version
-  //  Http().bind("localhost", 8082).runForeach { connection =>
-  //    connection.handleWith(streamsBasedRequestHandler)
-  //  }
+  Http().bind("localhost", 8082).runForeach { connection =>
+    connection.handleWith(streamsBasedRequestHandler)
+  }
 
   // shorthand version
   Http().bindAndHandle(streamsBasedRequestHandler, "localhost", 8082)
 
-  /**
-    * Exercise: create your own HTTP server running on localhost on 8388, which replies
+  /** Exercise: create your own HTTP server running on localhost on 8388, which replies
     *   - with a welcome message on the "front door" localhost:8388
     *   - with a proper HTML on localhost:8388/about
     *   - with a 404 message otherwise

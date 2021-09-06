@@ -3,11 +3,11 @@ package part3_highlevelserver
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
-import akka.stream.ActorMaterializer
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.unmarshalling.FromRequestUnmarshaller
 import akka.pattern.ask
+import akka.stream.ActorMaterializer
 import akka.util.Timeout
 // step 1
 import spray.json._
@@ -28,7 +28,7 @@ object GameAreaMap {
 class GameAreaMap extends Actor with ActorLogging {
   import GameAreaMap._
 
-  var players = Map[String, Player]()
+  var players: Map[String, Player] = Map[String, Player]()
 
   override def receive: Receive = {
     case GetAllPlayers =>
@@ -68,8 +68,8 @@ object MarshallingJSON extends App
 
   implicit val system = ActorSystem("MarshallingJSON")
   implicit val materializer = ActorMaterializer()
-  import system.dispatcher
   import GameAreaMap._
+  import system.dispatcher
 
   val rtjvmGameMap = system.actorOf(Props[GameAreaMap], "rockTheJVMGameAreaMap")
   val playersList = List(

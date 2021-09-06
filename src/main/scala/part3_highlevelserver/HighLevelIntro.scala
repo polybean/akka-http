@@ -5,12 +5,11 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
-import part2_lowlevelserver.HttpsContext
 
 object HighLevelIntro extends App {
 
-  implicit val system = ActorSystem("HighLevelIntro")
-  implicit val materializer = ActorMaterializer()
+  implicit val system: ActorSystem = ActorSystem("HighLevelIntro")
+  implicit val materializer: ActorMaterializer = ActorMaterializer()
   import system.dispatcher
 
   // directives
@@ -35,27 +34,25 @@ object HighLevelIntro extends App {
       get {
         complete(StatusCodes.OK)
       } /* VERY IMPORTANT ---> */ ~
-      post {
-        complete(StatusCodes.Forbidden)
-      }
+        post {
+          complete(StatusCodes.Forbidden)
+        }
     } ~
-    path("home") {
-      complete(
-        HttpEntity(
-          ContentTypes.`text/html(UTF-8)`,
-          """
+      path("home") {
+        complete(
+          HttpEntity(
+            ContentTypes.`text/html(UTF-8)`,
+            """
             |<html>
             | <body>
             |   Hello from the high level Akka HTTP!
             | </body>
             |</html>
           """.stripMargin
+          )
         )
-      )
-    } // Routing tree
-
+      } // Routing tree
 
   Http().bindAndHandle(pathGetRoute, "localhost", 8080)
-
 
 }

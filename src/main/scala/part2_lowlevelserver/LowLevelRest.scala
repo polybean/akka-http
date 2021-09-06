@@ -1,16 +1,16 @@
 package part2_lowlevelserver
 
-import akka.pattern.ask
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.Uri.Query
 import akka.http.scaladsl.model._
+import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 
-
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.language.postfixOps
 
 // step 1
 import spray.json._
@@ -50,15 +50,15 @@ class GuitarDB extends Actor with ActorLogging {
     case AddQuantity(id, quantity) =>
       log.info(s"Trying to add $quantity items for guitar $id")
       val guitar: Option[Guitar] = guitars.get(id)
-      val newGuitar: Option[Guitar] = guitar.map {
-        case Guitar(make, model, q) => Guitar(make, model, q + quantity)
+      val newGuitar: Option[Guitar] = guitar.map { case Guitar(make, model, q) =>
+        Guitar(make, model, q + quantity)
       }
 
       newGuitar.foreach(guitar => guitars = guitars + (id -> guitar))
       sender() ! newGuitar
 
     case FindGuitarsInStock(inStock) =>
-      log.info(s"Searching for all guitars ${if(inStock) "in" else "out of"} stock")
+      log.info(s"Searching for all guitars ${if (inStock) "in" else "out of"} stock")
       if (inStock)
         sender() ! guitars.values.filter(_.quantity > 0)
       else
@@ -77,8 +77,8 @@ object LowLevelRest extends App with GuitarStoreJsonProtocol {
 
   implicit val system = ActorSystem("LowLevelRest")
   implicit val materializer = ActorMaterializer()
-  import system.dispatcher
   import GuitarDB._
+  import system.dispatcher
 
   /*
     - GET on localhost:8080/api/guitar => ALL the guitars in the store
@@ -118,7 +118,7 @@ object LowLevelRest extends App with GuitarStoreJsonProtocol {
   /*
     server code
    */
-  implicit val defaultTimeout = Timeout(2 seconds)
+  implicit val defaultTimeout: Timeout = Timeout(2 seconds)
 
   def getGuitar(query: Query): Future[HttpResponse] = {
     val guitarId = query.get("id").map(_.toInt) // Option[Int]
@@ -141,7 +141,7 @@ object LowLevelRest extends App with GuitarStoreJsonProtocol {
   }
 
   val requestHandler: HttpRequest => Future[HttpResponse] = {
-    case HttpRequest(HttpMethods.POST, uri@Uri.Path("/api/guitar/inventory"), _, _, _) =>
+    case HttpRequest(HttpMethods.POST, uri @ Uri.Path("/api/guitar/inventory"), _, _, _) =>
       val query = uri.query()
       val guitarId: Option[Int] = query.get("id").map(_.toInt)
       val guitarQuantity: Option[Int] = query.get("quantity").map(_.toInt)
@@ -150,19 +150,21 @@ object LowLevelRest extends App with GuitarStoreJsonProtocol {
         id <- guitarId
         quantity <- guitarQuantity
       } yield {
-        val newGuitarFuture: Future[Option[Guitar]] = (guitarDb ? AddQuantity(id, quantity)).mapTo[Option[Guitar]]
+        val newGuitarFuture: Future[Option[Guitar]] =
+          (guitarDb ? AddQuantity(id, quantity)).mapTo[Option[Guitar]]
         newGuitarFuture.map(_ => HttpResponse(StatusCodes.OK))
       }
 
       validGuitarResponseFuture.getOrElse(Future(HttpResponse(StatusCodes.BadRequest)))
 
-    case HttpRequest(HttpMethods.GET, uri@Uri.Path("/api/guitar/inventory"), _, _, _) =>
+    case HttpRequest(HttpMethods.GET, uri @ Uri.Path("/api/guitar/inventory"), _, _, _) =>
       val query = uri.query()
       val inStockOption = query.get("inStock").map(_.toBoolean)
 
       inStockOption match {
         case Some(inStock) =>
-          val guitarsFuture: Future[List[Guitar]] = (guitarDb ? FindGuitarsInStock(inStock)).mapTo[List[Guitar]]
+          val guitarsFuture: Future[List[Guitar]] =
+            (guitarDb ? FindGuitarsInStock(inStock)).mapTo[List[Guitar]]
           guitarsFuture.map { guitars =>
             HttpResponse(
               entity = HttpEntity(
@@ -174,7 +176,7 @@ object LowLevelRest extends App with GuitarStoreJsonProtocol {
         case None => Future(HttpResponse(StatusCodes.BadRequest))
       }
 
-    case HttpRequest(HttpMethods.GET, uri@Uri.Path("/api/guitar"), _, _, _) =>
+    case HttpRequest(HttpMethods.GET, uri @ Uri.Path("/api/guitar"), _, _, _) =>
       /*
         query parameter handling code
        */
@@ -199,11 +201,11 @@ object LowLevelRest extends App with GuitarStoreJsonProtocol {
       // entities are a Source[ByteString]
       val strictEntityFuture = entity.toStrict(3 seconds)
       strictEntityFuture.flatMap { strictEntity =>
-
         val guitarJsonString = strictEntity.data.utf8String
         val guitar = guitarJsonString.parseJson.convertTo[Guitar]
 
-        val guitarCreatedFuture: Future[GuitarCreated] = (guitarDb ? CreateGuitar(guitar)).mapTo[GuitarCreated]
+        val guitarCreatedFuture: Future[GuitarCreated] =
+          (guitarDb ? CreateGuitar(guitar)).mapTo[GuitarCreated]
         guitarCreatedFuture.map { _ =>
           HttpResponse(StatusCodes.OK)
         }
@@ -218,10 +220,10 @@ object LowLevelRest extends App with GuitarStoreJsonProtocol {
 
   Http().bindAndHandleAsync(requestHandler, "localhost", 8080)
 
-  /**
-    * Exercise: enhance the Guitar case class with a quantity field, by default 0
-    * - GET to /api/guitar/inventory?inStock=true/false which returns the guitars in stock as a JSON
-    * - POST to /api/guitar/inventory?id=X&quantity=Y which adds Y guitars to the stock for guitar with id X
-    *
+  /** Exercise: enhance the Guitar case class with a quantity field, by default 0
+    *   - GET to /api/guitar/inventory?inStock=true/false which returns the guitars in stock as a
+    *     JSON
+    *   - POST to /api/guitar/inventory?id=X&quantity=Y which adds Y guitars to the stock for guitar
+    *     with id X
     */
 }
